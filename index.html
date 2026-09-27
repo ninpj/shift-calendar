@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>更表轉行事曆</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon-192.png" type="image/png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="更表">
+<meta name="theme-color" content="#1d2430">
+<style>
+:root{
+  --bg:#eef1f4; --panel:#ffffff; --ink:#1d2430; --muted:#6b7584; --line:#d9dee5;
+  --day:#f2b632; --day-ink:#4a3300; --night:#2f3a8f; --night-ink:#ffffff;
+  --weekend:#f6f0fa;
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#14171c; --panel:#1d2128; --ink:#e8ebf0; --muted:#98a1ae; --line:#2e343d;
+    --weekend:#241f2b; --night:#5664d6;
+  }
+}
+*,*::before,*::after{box-sizing:inherit}
+html,body{margin:0}
+body{background:var(--bg);color:var(--ink);
+  font-family:"PingFang TC","Noto Sans TC","Microsoft JhengHei","Heiti TC",system-ui,sans-serif;
+  line-height:1.5}
+main{max-width:520px;margin:0 auto;padding:20px 16px 40px}
+h1{font-size:1.35rem;margin:0 0 4px;font-weight:700}
+.hint{color:var(--muted);font-size:.9rem;margin:0 0 18px}
+.monthbar{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+.monthbar strong{font-size:1.2rem}
+button{font:inherit;cursor:pointer}
+.nav{border:1px solid var(--line);background:var(--panel);color:var(--ink);
+  width:40px;height:40px;border-radius:10px;font-size:1.1rem}
+.grid{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;background:var(--panel);
+  padding:8px;border-radius:14px;border:1px solid var(--line)}
+.wd{text-align:center;font-size:.78rem;color:var(--muted);padding:2px 0 4px}
+.cell{aspect-ratio:1/1.05;border:none;border-radius:9px;background:transparent;color:var(--ink);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;
+  font-size:1rem;transition:transform .08s}
+.cell:active{transform:scale(.94)}
+.cell.we{background:var(--weekend)}
+.cell.other{opacity:.45}
+.cell .tag{font-size:.68rem;font-weight:700;letter-spacing:.02em;min-height:1em}
+.cell.day{background:var(--day);color:var(--day-ink)}
+.cell.night{background:var(--night);color:var(--night-ink)}
+.cell:focus-visible,.nav:focus-visible,.primary:focus-visible,.ghost:focus-visible{outline:3px solid #3b82f6;outline-offset:2px}
+.legend{display:flex;gap:14px;font-size:.85rem;color:var(--muted);margin:10px 2px 16px;flex-wrap:wrap}
+.sw{display:inline-block;width:12px;height:12px;border-radius:3px;vertical-align:-1px;margin-right:4px}
+.summary{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:12px 14px;margin-bottom:14px;font-size:.95rem}
+.summary b{font-variant-numeric:tabular-nums}
+.actions{display:flex;gap:10px}
+.primary{flex:1;border:none;background:var(--ink);color:var(--bg);padding:14px;border-radius:12px;font-weight:700;font-size:1rem}
+.primary:disabled{opacity:.35;cursor:not-allowed}
+.ghost{border:1px solid var(--line);background:var(--panel);color:var(--ink);padding:14px 16px;border-radius:12px}
+details{margin-top:22px;background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:10px 14px}
+summary{cursor:pointer;font-weight:600}
+.row{display:grid;grid-template-columns:4.5em 1fr 1fr;gap:8px;align-items:center;margin-top:10px}
+.row input{width:100%;font:inherit;padding:8px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink)}
+.small{font-size:.8rem;color:var(--muted);margin-top:8px}
+.msg{min-height:1.4em;font-size:.9rem;color:var(--muted);margin-top:10px}
+@media (prefers-reduced-motion: reduce){.cell{transition:none}}
+</style>
+</head>
+<body>
+<main>
+  <h1>更表轉行事曆</h1>
+  <p class="hint">點日子切換：日更 → 夜更 → 休息。選好後下載，匯入手機或 Google 行事曆。</p>
+
+  <div class="monthbar">
+    <button class="nav" id="prev" aria-label="上個月">‹</button>
+    <strong id="title"></strong>
+    <button class="nav" id="next" aria-label="下個月">›</button>
+  </div>
+
+  <div class="grid" id="grid"></div>
+
+  <div class="legend">
+    <span><span class="sw" style="background:var(--day)"></span>日更</span>
+    <span><span class="sw" style="background:var(--night)"></span>夜更</span>
+    <span><span class="sw" style="background:var(--weekend);border:1px solid var(--line)"></span>週末</span>
+  </div>
+
+  <div class="summary" id="summary"></div>
+
+  <div class="actions">
+    <button class="primary" id="dl">下載行事曆檔 (.ics)</button>
+    <button class="ghost" id="clear">清除</button>
+  </div>
+  <div class="actions" id="shareRow" hidden style="margin-top:10px">
+    <button class="ghost" id="share" style="flex:1">分享／存到「檔案」</button>
+  </div>
+  <div class="msg" id="msg" role="status"></div>
+
+  <details>
+    <summary>更次時間設定</summary>
+    <div class="row"><span>日更</span><input type="time" id="dS"><input type="time" id="dE"></div>
+    <div class="row"><span>夜更</span><input type="time" id="nS"><input type="time" id="nE"></div>
+    <div class="row"><span>標題</span><input id="dT" aria-label="日更標題"><input id="nT" aria-label="夜更標題"></div>
+    <p class="small">結束時間比開始早，會自動當成翌日。設定會記在這部裝置上。</p>
+  </details>
+</main>
+
+<script>
+(function(){
+  var DEF={dS:"08:00",dE:"18:00",nS:"18:00",nE:"08:00",dT:"日更",nT:"夜更"};
+  var cfg=Object.assign({},DEF);
+  try{var s=localStorage.getItem("roster-cfg");if(s)Object.assign(cfg,JSON.parse(s));}catch(e){}
+  Object.keys(DEF).forEach(function(k){
+    var el=document.getElementById(k); el.value=cfg[k];
+    el.addEventListener("change",function(){cfg[k]=el.value||DEF[k];
+      try{localStorage.setItem("roster-cfg",JSON.stringify(cfg));}catch(e){} render();});
+  });
+
+  var marks={}; // "YYYY-MM-DD" -> "day"|"night"
+  try{var ms=localStorage.getItem("roster-marks");if(ms)marks=JSON.parse(ms)||{};}catch(e){}
+  function saveMarks(){try{localStorage.setItem("roster-marks",JSON.stringify(marks));}catch(e){}}
+  var now=new Date(); var y=now.getFullYear(), m=now.getMonth()+1; // show next month by default
+  if(m>11){m=0;y++;}
+  var grid=document.getElementById("grid");
+
+  function pad(n){return (n<10?"0":"")+n}
+  function key(d){return d.getFullYear()+"-"+pad(d.getMonth()+1)+"-"+pad(d.getDate())}
+  function hrs(a,b){var p=a.split(":"),q=b.split(":");var s=+p[0]*60+ +p[1],e=+q[0]*60+ +q[1];if(e<=s)e+=1440;return (e-s)/60}
+
+  function visibleDates(){
+    var first=new Date(y,m,1), start=new Date(y,m,1-first.getDay());
+    var last=new Date(y,m+1,0), end=new Date(y,m+1,0+(6-last.getDay()));
+    var out=[]; for(var d=new Date(start);d<=end;d.setDate(d.getDate()+1)) out.push(new Date(d));
+    return out;
+  }
+
+  function render(){
+    document.getElementById("title").textContent=y+" 年 "+(m+1)+" 月";
+    grid.innerHTML="";
+    ["日","一","二","三","四","五","六"].forEach(function(w){var e=document.createElement("div");e.className="wd";e.textContent=w;grid.appendChild(e);});
+    var nd=0,nn=0;
+    visibleDates().forEach(function(d){
+      var k=key(d), st=marks[k]||"", b=document.createElement("button");
+      b.className="cell"+(d.getMonth()!==m?" other":"")+((d.getDay()===0||d.getDay()===6)?" we":"")+(st?" "+st:"");
+      var tag=st==="day"?cfg.dT:st==="night"?cfg.nT:"";
+      b.innerHTML="<span>"+d.getDate()+"</span><span class='tag'></span>";
+      b.lastChild.textContent=tag;
+      b.setAttribute("aria-label",(d.getMonth()+1)+"月"+d.getDate()+"日 "+(tag||"休息"));
+      b.onclick=function(){marks[k]=st===""?"day":st==="day"?"night":"";if(!marks[k])delete marks[k];saveMarks();render();};
+      grid.appendChild(b);
+      if(st==="day")nd++; if(st==="night")nn++;
+    });
+    var total=nd*hrs(cfg.dS,cfg.dE)+nn*hrs(cfg.nS,cfg.nE);
+    document.getElementById("summary").innerHTML="日更 <b>"+nd+"</b> 更　夜更 <b>"+nn+"</b> 更　共 <b>"+total+"</b> 小時";
+    document.getElementById("dl").disabled=(nd+nn)===0;
+    document.getElementById("share").disabled=(nd+nn)===0;
+  }
+
+  function stamp(d,t){var p=t.split(":");return d.getFullYear()+pad(d.getMonth()+1)+pad(d.getDate())+"T"+pad(+p[0])+pad(+p[1])+"00"}
+
+  // 文字欄位要跳脫 \ ; , 和換行（RFC 5545 §3.3.11）
+  function esc(t){return String(t).replace(/\\/g,"\\\\").replace(/;/g,"\\;").replace(/,/g,"\\,").replace(/\r?\n/g,"\\n")}
+  // 每行最長 75 bytes，超過要折行（RFC 5545 §3.1）；中文字 UTF-8 佔 3 bytes
+  function fold(line){
+    var out=[],cur="",n=0,lim=75;
+    Array.from(line).forEach(function(ch){
+      var b=unescape(encodeURIComponent(ch)).length;
+      if(n+b>lim){out.push(cur);cur="";n=0;lim=74;}
+      cur+=ch;n+=b;
+    });
+    out.push(cur); return out.join("\r\n ");
+  }
+
+  // 時間用 floating time（無 Z、無 TZID），照手機當地時間顯示
+  function buildICS(){
+    var L=["BEGIN:VCALENDAR","VERSION:2.0","PRODID:-//roster-tool//ZH","CALSCALE:GREGORIAN","METHOD:PUBLISH"];
+    var nowS=new Date().toISOString().replace(/[-:]/g,"").split(".")[0]+"Z";
+    visibleDates().forEach(function(d){
+      var st=marks[key(d)]; if(!st)return;
+      var s=st==="day"?cfg.dS:cfg.nS, e=st==="day"?cfg.dE:cfg.nE;
+      // 跨日（例如夜更）結束日 +1；setDate 會自動處理月底→下月 1 號、12/31→翌年 1/1
+      var ed=new Date(d); if(hrs(s,e)*60+toMin(s)>=1440) ed.setDate(ed.getDate()+1);
+      // UID 只按日期，同一天改班次後重新匯入會更新而不是重複
+      L.push("BEGIN:VEVENT","UID:shift-"+key(d)+"@roster-tool","DTSTAMP:"+nowS,
+        "DTSTART:"+stamp(d,s),"DTEND:"+stamp(ed,e),"SUMMARY:"+esc(st==="day"?cfg.dT:cfg.nT),"END:VEVENT");
+    });
+    L.push("END:VCALENDAR"); return L.map(fold).join("\r\n")+"\r\n";
+  }
+  function toMin(t){var p=t.split(":");return +p[0]*60+ +p[1]}
+
+  var isIOS=/iPad|iPhone|iPod/.test(navigator.userAgent)||(navigator.platform==="MacIntel"&&navigator.maxTouchPoints>1);
+  function fname(){return "shift-"+y+"-"+pad(m+1)+".ics"}
+  var msg=document.getElementById("msg");
+
+  document.getElementById("dl").onclick=function(){
+    var ics=buildICS();
+    if(isIOS){
+      // iOS：blob 下載只會存進「下載項目」不會叫出行事曆；
+      // 直接打開 text/calendar 的 data URL，Safari 會顯示行事曆預覽和「加入全部」。
+      location.href="data:text/calendar;charset=utf-8,"+encodeURIComponent(ics);
+      msg.textContent="如果沒有出現「加入全部」，請改按下面的「分享／存到「檔案」」。";
+      return;
+    }
+    var blob=new Blob([ics],{type:"text/calendar;charset=utf-8"});
+    var a=document.createElement("a"); a.href=URL.createObjectURL(blob);
+    a.download=fname(); document.body.appendChild(a); a.click();
+    setTimeout(function(){URL.revokeObjectURL(a.href);a.remove();},1000);
+    msg.textContent="已下載，打開檔案即可匯入行事曆。";
+  };
+
+  // 系統分享面板（iOS / Android 支援傳檔案時才顯示）：可存到「檔案」或傳給行事曆 App
+  try{
+    var probe=new File(["x"],"x.ics",{type:"text/calendar"});
+    if(navigator.canShare&&navigator.canShare({files:[probe]})) document.getElementById("shareRow").hidden=false;
+  }catch(e){}
+  document.getElementById("share").onclick=function(){
+    var f=new File([buildICS()],fname(),{type:"text/calendar"});
+    navigator.share({files:[f]}).catch(function(err){if(err&&err.name!=="AbortError")msg.textContent="分享失敗："+err.message;});
+  };
+
+  document.getElementById("clear").onclick=function(){
+    visibleDates().forEach(function(d){delete marks[key(d)];});
+    saveMarks(); msg.textContent=""; render();
+  };
+  document.getElementById("prev").onclick=function(){m--;if(m<0){m=11;y--;}document.getElementById("msg").textContent="";render();};
+  document.getElementById("next").onclick=function(){m++;if(m>11){m=0;y++;}document.getElementById("msg").textContent="";render();};
+  render();
+  if("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(function(){});
+})();
+</script>
+</body>
+</html>
