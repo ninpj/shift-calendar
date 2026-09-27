@@ -190,7 +190,9 @@ summary{cursor:pointer;font-weight:600}
   }
   function toMin(t){var p=t.split(":");return +p[0]*60+ +p[1]}
 
-  var isIOS=/iPad|iPhone|iPod/.test(navigator.userAgent)||(navigator.platform==="MacIntel"&&navigator.maxTouchPoints>1);
+  // iPadOS 會偽裝成 Mac（MacIntel + 觸控），所以另外判斷；排除 Android 以免誤判
+  var ua=navigator.userAgent;
+  var isIOS=!/Android/i.test(ua)&&(/iPad|iPhone|iPod/.test(ua)||(navigator.platform==="MacIntel"&&navigator.maxTouchPoints>1));
   function fname(){return "shift-"+y+"-"+pad(m+1)+".ics"}
   var msg=document.getElementById("msg");
 
